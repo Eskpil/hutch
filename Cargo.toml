@@ -2,7 +2,33 @@
 name = "hutch"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies.smithay]
+git = "https://github.com/Smithay/smithay"
+branch = "rework-wayland-rs-0.30"
+features = [
+  "backend_winit",
+  "wayland_frontend",
+  "backend_session_elogind"
+]
+default-features = false
+
+[dependencies.wayland-server]
+git = "https://github.com/Smithay/wayland-rs"
+version = "=0.30.0-alpha10"
+
+[dependencies.wayland-protocols]
+git = "https://github.com/Smithay/wayland-rs"
+version = "=0.30.0-alpha10"
+default-features = false
+features = ["server"]
+
 
 [dependencies]
+eyre = "0.6.8"
+slog = { version = "2.1.1" }
+slog-term = "2.8"
+slog-async = "2.2"
+slog-stdlog = "4.1.0"
+slog-scope = "4.4.0"
