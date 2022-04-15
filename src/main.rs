@@ -1,4 +1,8 @@
-use std::{sync::Arc, error::Error};
+use std::{
+    sync::Arc,
+    error::Error,
+    time::Instant,
+};
 
 use eyre::Result;
 
@@ -138,15 +142,12 @@ fn send_frames_surface_tree(
     time: u32,
 ) {
     with_surface_tree_downward(
-        surface,
-        (),
+        surface, (),
         |_, _, &()| TraversalAction::DoChildren(()),
         |_surf, states, &()| {
-            for callback in states
-                .cached_state
+            for callback in states.cached_state
                 .current::<SurfaceAttributes>()
-                .frame_callbacks
-                .drain(..)
+                .frame_callbacks.drain(..)
             {
                 callback.done(dh, time);
             }
@@ -160,8 +161,8 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
 
     let mut display: Display<Hutch> = Display::new()?;
 
-    let seat_state: SeatState<Hutch> = SeatState::new();
     let seat: Seat<Hutch> = Seat::new(&mut display, "winit", None);
+    let seat_state: SeatState<Hutch> = SeatState::new();
 
     let mut state: Hutch = {
         Hutch {
@@ -175,21 +176,16 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
 
     let listener: ListeningSocket = ListeningSocket::bind("wayland-3").unwrap();
 
-    let mut clients= Vec::new();
+    let mut clients = Vec::new();
 
     let (mut backend, mut winit) = winit::init(None)?;
 
-    let start_time = std::time::Instant::now();
+    let start_time = Instant::now();
 
-    let keyboard = state.seat
-        .add_keyboard(
-            &mut display.handle(),
-            Default::default(),
-            200,
-            200,
-            |_, _| {}
-        )
-        .unwrap();
+    let keyboard = state.seat.add_keyboard(
+        &mut display.handle(), Default::default(), 200, 200, |_, _| {}
+    )
+    .unwrap();
 
     std::env::set_var("WAYLAND_DISPLAY", "wayland-3");
     std::process::Command::new("weston-terminal").spawn().ok();
@@ -199,16 +195,12 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
             |event| match event {
                 WinitEvent::Resized { .. } => {}
                 WinitEvent::Input(event) => match event {
-                    InputEvent::Keyboard { event } => {
+                    InputEvent::Keyboard { event: ev } => {
                         let dh = &mut display.handle();
-                        keyboard.input::<(), _>(
-                            dh,
-                            event.key_code(),
-                             event.state(),
-                             0.into(),
-                             0,
-                             |_, _| {
-                                 FilterResult::Forward
+
+                        keyboard.input::<(), _>(dh, ev.key_code(), ev.state(), 0.into(), 0,
+                            |_, _| {
+                                FilterResult::Forward
                             }
                         );
                     }
@@ -238,48 +230,44 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
         let size = backend.window_size().physical_size;
         let damage = Rectangle::from_loc_and_size((0, 0), size);
 
-        backend
-            .renderer()
+        backend.renderer()
             .render(
                 size,
                 Transform::Flipped180,
-                |renderer,frame|  {
-                    frame.clear([0.1, 0.0, 0.0, 1.0], &[damage.to_f64()]).unwrap();
+                |renderer, frame|  {
+                    frame.clear(
+                        [0.3, 0.3, 0.3, 1.0], &[damage.to_f64()]
+                    )
+                    .unwrap();
 
-                    state.xdg_shell_state.toplevel_surfaces(|surfaces| {
-                        for surface in surfaces {
-                            let dh = &mut display.handle();
-                            let surface = surface.wl_surface();
+                    state.xdg_shell_state
+                        .toplevel_surfaces(
+                            |surfaces| {
+                                for surface in surfaces {
+                                    let dh = &mut display.handle();
+                                    let surface = surface.wl_surface();
 
-                            draw_surface_tree(
-                                renderer,
-                                frame,
-                                surface,
-                                1.0,
-                                (0, 0).into(),
-                                &[damage.to_logical(1)],
-                                dh,
-                                &log,
-                            )
-                            .unwrap();
+                                    draw_surface_tree(
+                                        renderer, frame, surface, 1.0, (0, 0).into(), &[damage.to_logical(1)], dh, &log
+                                    )
+                                    .unwrap();
 
-                            send_frames_surface_tree(
-                                dh,
-                                surface,
-                                start_time
-                                    .elapsed()
-                                    .as_millis() as u32
-                            );
-                        }
-                    }
-                );
-            }
-        )?;
+                                    send_frames_surface_tree(
+                                        dh, surface, start_time.elapsed().as_millis() as u32
+                                    );
+                                }
+                            }
+                        );
+                }
+            )?;
 
         if let Some(stream) = listener.accept()? {
             println!("Got a client: {:?}", stream);
 
-            let client = display.insert_client(stream, Arc::new(ClientState)).unwerap();
+            let client = display.insert_client(
+                stream, Arc::new(ClientState)
+            )
+            .unwerap();
 
             clients.push(client);
         }
@@ -287,7 +275,10 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
         display.dispatch_clients(&mut state)?;
         display.flush_clients()?;
 
-        backend.submit(Some(&[damage.to_logical(1)]), 1.0).unwrap();
+        backend.submit(
+            Some(&[damage.to_logical(1)]), 1.0
+        )
+        .unwrap();
     }
 
     Ok(())
@@ -301,5 +292,5 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 delegate_shm!(Hutch);
 delegate_seat!(Hutch);
-delegate_compositor!(Hutch);
 delegate_xdg_shell!(Hutch);
+delegate_compositor!(Hutch);
