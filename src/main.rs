@@ -42,10 +42,8 @@ use smithay::backend::{
     winit::{self, WinitEvent},
     input::{InputEvent, KeyboardKeyEvent},
 };
-use smithay::reexports::{
-    wayland_server::{Display, DisplayHandle},
-};
 use smithay::utils::{Rectangle, Transform};
+use smithay::reexports::wayland_server::{Display, DisplayHandle};
 
 use wayland_server::{
     backend::{
@@ -54,11 +52,12 @@ use wayland_server::{
         DisconnectReason
     },
     socket::ListeningSocket,
-    protocol::wl_surface::{WlSurface},
+    protocol::wl_surface::WlSurface,
 };
 
 use wayland_protocols::xdg_shell::server::xdg_toplevel::State;
 
+#[derive(Debug)]
 struct Hutch {
     seat: Seat<Self>,
     seat_state: SeatState<Self>,
@@ -68,6 +67,7 @@ struct Hutch {
     compositor_state: CompositorState,
 }
 
+#[derive(Debug)]
 struct ClientState;
 
 impl AsRef<ShmState> for Hutch {
@@ -161,16 +161,17 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
 
     let mut display: Display<Hutch> = Display::new()?;
 
-    let seat: Seat<Hutch> = Seat::new(&mut display, "winit", None);
+    let seat: Seat<Hutch> = Seat::new(&mut display, "winit", &log);
     let seat_state: SeatState<Hutch> = SeatState::new();
 
     let mut state: Hutch = {
         Hutch {
             seat,
             seat_state,
-            shm_state: ShmState::new(&mut display, None),
-            xdg_shell_state: XdgShellState::new(&mut display, None).0,
-            compositor_state: CompositorState::new(&mut display, vec![], None),
+
+            shm_state: ShmState::new(&mut display, vec![], &log),
+            xdg_shell_state: XdgShellState::new(&mut display, &log).0,
+            compositor_state: CompositorState::new(&mut display,  &log),
         }
     };
 
@@ -178,7 +179,7 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
 
     let mut clients = Vec::new();
 
-    let (mut backend, mut winit) = winit::init(None)?;
+    let (mut backend, mut winit) = winit::init(&log)?;
 
     let start_time = Instant::now();
 
@@ -234,7 +235,7 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
             .render(
                 size,
                 Transform::Flipped180,
-                |renderer, frame|  {
+                |renderer, frame| {
                     frame.clear(
                         [0.3, 0.3, 0.3, 1.0], &[damage.to_f64()]
                     )
@@ -267,7 +268,7 @@ fn run_winit() -> Result<(), Box<dyn Error>> {
             let client = display.insert_client(
                 stream, Arc::new(ClientState)
             )
-            .unwerap();
+            .unwrap();
 
             clients.push(client);
         }
